@@ -449,7 +449,7 @@ export default function CardExperience({
               </button>
               <button onClick={advance} className={ctl} style={{ borderColor: colors.fg }} aria-label={i === slides.length - 1 ? "Finish" : "Next wish"}>›</button>
               <button onClick={toggleMute} className={ctl} style={{ borderColor: colors.fg }} aria-label={muted ? "Turn sound on" : "Turn sound off"}>
-                {muted ? "🔇" : "🔊"}
+                {muted ? "Sound Off" : "Sound On"}
               </button>
             </div>
           </div>
