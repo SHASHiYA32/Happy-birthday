@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎂 Many Happy Returns
+# 🎂 Wish Spark by DevDynamo
 
 **A birthday card that opens like a real one.**
 
