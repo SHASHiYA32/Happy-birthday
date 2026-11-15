@@ -12,7 +12,7 @@ export default async function SiteNav() {
   return (
     <header className="relative z-20 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
       <Link href="/" className="display text-2xl font-semibold italic tracking-tight">
-        Wish Spark <span className="text-sm text-tomato">by DevDynamo</span>
+        Veloura <span className="text-sm text-tomato">by DevDynamo</span>
       </Link>
 
       {/* Desktop Navigation */}

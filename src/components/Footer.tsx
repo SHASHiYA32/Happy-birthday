@@ -4,14 +4,14 @@ import React, { useState, useEffect } from "react";
 
 export default function WavyFooter() {
   const [copied, setCopied] = useState(false);
-  const [shareUrl, setShareUrl] = useState("https://dd-wishspark.vercel.app");
+  const [shareUrl, setShareUrl] = useState("https://dd-Veloura.vercel.app");
 
   useEffect(() => {
     setShareUrl(window.location.origin);
   }, []);
 
   const shareText = encodeURIComponent(
-    "Create and send sealed digital birthday cards with Wish Spark!"
+    "Create and send sealed digital birthday cards with Veloura!"
   );
   const encodedUrl = encodeURIComponent(shareUrl);
 
@@ -95,7 +95,7 @@ export default function WavyFooter() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 pb-8">
             <div>
               <span className="font-serif italic font-bold text-2xl sm:text-3xl tracking-tight text-[#1C1917] block">
-                Wish Spark
+                Veloura
               </span>
               <p className="text-xs sm:text-sm font-medium text-[#1C1917]/80 mt-1">
                 Sealed digital keepsakes worth opening.
@@ -153,7 +153,7 @@ export default function WavyFooter() {
 
           {/* Bottom Utility Bar */}
           <div className="pt-6 border-t border-[#1C1917]/20 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium text-[#1C1917]/85">
-            <p>© 2026 Wish Spark. All rights reserved.</p>
+            <p>© 2026 Veloura. All rights reserved.</p>
 
             <p>
               Crafted by{" "}
