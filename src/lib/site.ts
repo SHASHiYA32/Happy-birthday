@@ -17,5 +17,7 @@ export const SITE = {
     "personalized birthday wishes",
     "birthday card maker",
     "Veloura",
+    "Veloura birthday card",
+    "Veloura DevDynamo",
   ],
 };
