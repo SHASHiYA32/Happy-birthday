@@ -23,7 +23,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
           await navigator.clipboard.writeText(value);
           setDone(true);
           setTimeout(() => setDone(false), 1600);
-        } catch {}
+        } catch { }
       }}
     >
       {done ? "Copied" : label}
@@ -31,8 +31,100 @@ function CopyButton({ value, label }: { value: string; label: string }) {
   );
 }
 
+function ShareButtons({
+  recipient,
+  link,
+  coverFile,
+}: {
+  recipient: string;
+  link: string;
+  coverFile: File | null;
+}) {
+  const [canNativeShare, setCanNativeShare] = useState(false);
+
+  useEffect(() => {
+    setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
+  }, []);
+
+  const beautifulMessage = [
+    `Hi ${recipient},`,
+    ``,
+    `I put together a special birthday card just for you, filled with memories and wishes waiting to be opened.`,
+    ``,
+    `Open your card here:`,
+    `${link}`,
+  ].join("\n");
+
+  const shortTeaser = `Hi ${recipient}, I put together a special birthday card just for you, filled with memories and wishes waiting to be opened.`;
+
+  const encodedFullText = encodeURIComponent(beautifulMessage);
+  const encodedTeaser = encodeURIComponent(shortTeaser);
+  const encodedUrl = encodeURIComponent(link);
+
+  async function handleNativeShare() {
+    if (!navigator.share) return;
+    try {
+      const shareData: ShareData = {
+        title: `A birthday card for ${recipient}`,
+        text: beautifulMessage,
+        url: link,
+      };
+      if (coverFile && navigator.canShare?.({ files: [coverFile] })) {
+        shareData.files = [coverFile];
+      }
+      await navigator.share(shareData);
+    } catch {
+      // User dismissed share sheet
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <span className="label">Send the invitation</span>
+      <div className="flex flex-wrap gap-2.5">
+        <a
+          href={`https://wa.me/?text=${encodedFullText}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-full border-2 border-ink bg-[#25D366] px-4 py-2 text-sm font-bold text-ink shadow-[3px_3px_0_var(--ink)] transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        >
+          WhatsApp
+        </a>
+
+        <a
+          href={`https://t.me/share/url?url=${encodedUrl}&text=${encodedTeaser}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-full border-2 border-ink bg-[#26A5E4] px-4 py-2 text-sm font-bold text-white shadow-[3px_3px_0_var(--ink)] transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        >
+          Telegram
+        </a>
+
+        <a
+          href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}"e=${encodedTeaser}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center rounded-full border-2 border-ink bg-[#1877F2] px-4 py-2 text-sm font-bold text-white shadow-[3px_3px_0_var(--ink)] transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+        >
+          Facebook
+        </a>
+
+        {canNativeShare && (
+          <button
+            type="button"
+            onClick={handleNativeShare}
+            className="btn btn-quiet !px-4 !py-2 text-sm"
+          >
+            More apps
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CreateForm({ defaultSender }: { defaultSender: string }) {
-  const [state, action, pending] = useActionState<CreateState, FormData>(createCard, { });
+  const [state, action, pending] = useActionState<CreateState, FormData>(createCard, {});
   const [, startTransition] = useTransition();
   const [slides, setSlides] = useState<Slide[]>(() => [blank()]);
   const [busy, setBusy] = useState(false);
@@ -76,7 +168,18 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
   }
 
   if (state?.ok) {
-    const message = `Happy birthday, ${state.recipient}! I made you a card: ${state.link}\nYour code is sent separately.`;
+    const firstUploadedPhoto = slides.find((s) => s.file !== null)?.file ?? null;
+    const message = [
+      `Hi ${state.recipient},`,
+      ``,
+      `I put together a special birthday card just for you, filled with memories and wishes waiting to be opened.`,
+      ``,
+      `Open your card here: ${state.link}`,
+      `Use this one-time code to unlock it: ${state.otp}`,
+    ].join("\n");
+
+    const codeOnlyMessage = `Here is the one-time code to unlock your birthday card: ${state.otp}`;
+
     return (
       <motion.div
         initial={{ opacity: 0, scale: 0.94, rotate: -1.5 }}
@@ -85,18 +188,39 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
         className="mx-auto max-w-xl rounded-sm border-2 border-ink bg-[#fbf4e4] p-8 shadow-[8px_8px_0_var(--ink)]"
       >
         <p className="hand text-3xl text-tomato">Sealed.</p>
-        <h2 className="display mt-1 text-4xl font-semibold">{state.recipient}&apos;s card is ready.</h2>
+        <h2 className="display mt-1 text-4xl font-semibold">{state.recipient}'s card is ready.</h2>
 
         <div className="mt-8 space-y-6">
           <div>
             <span className="label">Private link</span>
             <p className="mt-1 break-all font-bold">{state.link}</p>
-            <div className="mt-2"><CopyButton value={state.link} label="Copy link" /></div>
+            <div className="mt-2">
+              <CopyButton value={state.link} label="Copy link" />
+            </div>
           </div>
+
+          <div className="border-y-2 border-dashed border-ink/20 py-5">
+            <ShareButtons
+              recipient={state.recipient}
+              link={state.link}
+              coverFile={firstUploadedPhoto}
+            />
+          </div>
+
           <div>
             <span className="label">One-time code</span>
             <p className="display mt-1 text-6xl font-semibold tracking-[0.2em] text-tomato">{state.otp}</p>
-            <div className="mt-2"><CopyButton value={state.otp} label="Copy code" /></div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <CopyButton value={state.otp} label="Copy code" />
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(codeOnlyMessage)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-quiet !px-4 !py-2 text-sm"
+              >
+                Send code on WhatsApp
+              </a>
+            </div>
             <p className="mt-3 text-sm text-ink-soft">
               This is the only time the code is shown. Send it in a different message from the link. If you lose
               it, make a new one from My cards.

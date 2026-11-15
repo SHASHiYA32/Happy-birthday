@@ -148,3 +148,49 @@ body::after {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+@keyframes tide-drift-left {
+  0% {
+    transform: translate3d(0, 0px, 0);
+  }
+  50% {
+    transform: translate3d(-25%, 6px, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0px, 0);
+  }
+}
+
+@keyframes tide-drift-right {
+  0% {
+    transform: translate3d(-50%, 4px, 0);
+  }
+  50% {
+    transform: translate3d(-25%, -4px, 0);
+  }
+  100% {
+    transform: translate3d(0, 4px, 0);
+  }
+}
+
+.animate-tide-back {
+  animation: tide-drift-right 26s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+.animate-tide-mid {
+  animation: tide-drift-left 21s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+.animate-tide-front {
+  animation: tide-drift-left 16s cubic-bezier(0.42, 0, 0.58, 1) infinite;
+}
+
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-tide-back,
+  .animate-tide-mid,
+  .animate-tide-front {
+    animation: none;
+  }
+}

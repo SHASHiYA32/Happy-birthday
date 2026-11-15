@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { logout } from "@/app/actions/auth";
+import LogoutButton from "./LogoutButton";
+import MobileMenu from "./MobileMenu";
 
 export default async function SiteNav() {
   const supabase = await createClient();
@@ -10,18 +11,18 @@ export default async function SiteNav() {
 
   return (
     <header className="relative z-20 mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6">
-      <Link href="/" className="display text-xl font-semibold italic tracking-tight">
-        Many Happy Returns
+      <Link href="/" className="display text-2xl font-semibold italic tracking-tight">
+        Wish Spark <span className="text-sm text-tomato">by DevDynamo</span>
       </Link>
-      <nav className="flex items-center gap-5 text-sm font-bold">
+
+      {/* Desktop Navigation */}
+      <nav className="hidden md:flex items-center gap-5 text-sm font-bold">
         {user ? (
           <>
             <Link href="/dashboard" className="hover:underline decoration-2 underline-offset-4">
               My cards
             </Link>
-            <form action={logout}>
-              <button className="hover:underline decoration-2 underline-offset-4">Log out</button>
-            </form>
+            <LogoutButton />
           </>
         ) : (
           <>
@@ -34,6 +35,9 @@ export default async function SiteNav() {
           </>
         )}
       </nav>
+
+      {/* Mobile Navigation Toggle & Menu */}
+      <MobileMenu user={user} />
     </header>
   );
 }
