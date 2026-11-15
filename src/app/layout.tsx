@@ -5,8 +5,8 @@ import "@fontsource-variable/caveat";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Many Happy Returns",
-  description: "Write the wishes, add the photos, send a private birthday card that opens like a real one.",
+  title: "Wish Spark",
+  description: "Write the wishes, add the photos, send a private wish card that opens like a real one.",
   robots: { index: true, follow: true },
 };
 
