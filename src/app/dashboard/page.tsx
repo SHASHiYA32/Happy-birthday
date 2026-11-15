@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import SiteNav from "@/components/SiteNav";
 import CardRow from "@/components/CardRow";
 import { createClient } from "@/lib/supabase/server";
+import WavyFooter from "@/components/Footer";
 
 export const metadata = { title: "My cards · Many Happy Returns" };
 
@@ -18,9 +19,9 @@ export default async function Dashboard() {
   const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col bg-[#EDE3D5]">
       <SiteNav />
-      <main className="mx-auto max-w-3xl px-6 pb-24 pt-6">
+      <main className="mx-auto max-w-3xl w-full px-6 pb-24 pt-6 flex-1">
         <div className="flex items-end justify-between gap-4">
           <h1 className="display text-5xl font-semibold">My cards</h1>
           <Link href="/create" className="btn !px-5 !py-2 text-sm">New card</Link>
@@ -44,6 +45,7 @@ export default async function Dashboard() {
           </p>
         )}
       </main>
-    </>
+      <WavyFooter />
+    </div>
   );
 }
