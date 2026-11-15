@@ -5,7 +5,7 @@ import "@fontsource-variable/caveat";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Wish Spark",
+  title: "Veloura",
   description: "Write the wishes, add the photos, send a private wish card that opens like a real one.",
   robots: { index: true, follow: true },
 };

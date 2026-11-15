@@ -23,7 +23,7 @@ export default function LogoutButton() {
                 {isPending ? "Logging out..." : "Log out"}
             </button>
 
-            {/* Confirmation Dialog matching Wish Spark theme */}
+            {/* Confirmation Dialog matching Veloura theme */}
             {showConfirm && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-[#1c1917]/40 backdrop-blur-[2px] p-4"
