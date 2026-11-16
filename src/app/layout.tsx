@@ -4,6 +4,7 @@ import "@fontsource-variable/karla";
 import "@fontsource-variable/caveat";
 import "./globals.css";
 import { SITE } from "@/lib/site";
+import { sileo, Toaster } from "sileo";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
@@ -95,6 +96,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
         />
         {children}
+         <Toaster position="top-center"   options={{fill: "#f1b9ae"}}/>
       </body>
     </html>
   );
