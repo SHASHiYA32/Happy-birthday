@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { createCard, type CreateState } from "@/app/actions/cards";
 import { compressImage } from "@/lib/compress-image";
+import { sileo } from "sileo";
 
 type Slide = { id: number; text: string; file: File | null; preview: string | null };
 
@@ -22,8 +23,11 @@ function CopyButton({ value, label }: { value: string; label: string }) {
         try {
           await navigator.clipboard.writeText(value);
           setDone(true);
+          sileo.success({ title: "Copied!", description: `${label} copied to clipboard.` });
           setTimeout(() => setDone(false), 1600);
-        } catch { }
+        } catch {
+          sileo.error({ title: "Failed", description: "Could not copy to clipboard." });
+        }
       }}
     >
       {done ? "Copied" : label}
@@ -124,7 +128,8 @@ function ShareButtons({
 }
 
 export default function CreateForm({ defaultSender }: { defaultSender: string }) {
-  const [state, action, pending] = useActionState<CreateState, FormData>(createCard, {});
+  const [resolvedState, setResolvedState] = useState<CreateState | null>(null);
+  const [state] = useActionState<CreateState, FormData>(createCard, {});
   const [, startTransition] = useTransition();
   const [slides, setSlides] = useState<Slide[]>(() => [blank()]);
   const [busy, setBusy] = useState(false);
@@ -132,6 +137,21 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => () => slides.forEach((s) => s.preview && URL.revokeObjectURL(s.preview)), []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const serverError = (state && typeof state === "object" && "error" in state)
+    ? (state as { error?: string }).error
+    : undefined;
+
+  const error = localError ?? serverError;
+
+  useEffect(() => {
+    if (error) {
+      sileo.error({
+        title: "Action Required",
+        description: error,
+      });
+    }
+  }, [error]);
 
   const update = (id: number, patch: Partial<Slide>) =>
     setSlides((all) => all.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -145,7 +165,9 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
       if (old) URL.revokeObjectURL(old);
       update(id, { file: small, preview: URL.createObjectURL(small) });
     } catch {
-      setLocalError("That file couldn't be read as a photo. Try a JPG, PNG or WebP.");
+      const errMsg = "That file couldn't be read as a photo. Try a JPG, PNG or WebP.";
+      setLocalError(errMsg);
+      sileo.error({ title: "Image Error", description: errMsg });
     }
   }
 
@@ -153,32 +175,57 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
     e.preventDefault();
     setBusy(true);
     setLocalError(null);
-    const base = new FormData(e.currentTarget);
-    const fd = new FormData();
-    for (const k of ["recipient", "sender", "birthday"]) fd.set(k, String(base.get(k) ?? ""));
-    fd.set("count", String(slides.length));
-    slides.forEach((s, i) => {
-      fd.set(`text_${i}`, s.text);
-      if (s.file) fd.set(`image_${i}`, s.file);
-    });
-    startTransition(() => {
-      action(fd);
-      setBusy(false);
+
+    const formElement = e.currentTarget;
+
+    const sealingPromise = async () => {
+      const base = new FormData(formElement);
+      const fd = new FormData();
+      for (const k of ["recipient", "sender", "birthday"]) fd.set(k, String(base.get(k) ?? ""));
+      fd.set("count", String(slides.length));
+      slides.forEach((s, i) => {
+        fd.set(`text_${i}`, s.text);
+        if (s.file) fd.set(`image_${i}`, s.file);
+      });
+
+      // Execute server action ONCE and wait for the result
+      const result = await createCard({}, fd);
+
+      if (result && typeof result === "object" && "error" in result && result.error) {
+        setLocalError(result.error);
+        throw new Error(result.error);
+      }
+
+      // Update state without triggering action() again (preventing duplicate insertion)
+      startTransition(() => {
+        setResolvedState(result);
+        setBusy(false);
+      });
+
+      return result;
+    };
+
+    sileo.promise(sealingPromise(), {
+      loading: { title: "Sealing card..." },
+      success: { title: "Card sealed!" },
+      error: { title: "Sealing failed" },
     });
   }
 
-  if (state?.ok) {
+  const activeState = resolvedState ?? state;
+
+  if (activeState?.ok) {
     const firstUploadedPhoto = slides.find((s) => s.file !== null)?.file ?? null;
     const message = [
-      `Hi ${state.recipient},`,
+      `Hi ${activeState.recipient},`,
       ``,
       `I put together a special birthday card just for you, filled with memories and wishes waiting to be opened.`,
       ``,
-      `Open your card here: ${state.link}`,
-      `Use this one-time code to unlock it: ${state.otp}`,
+      `Open your card here: ${activeState.link}`,
+      `Use this one-time code to unlock it: ${activeState.otp}`,
     ].join("\n");
 
-    const codeOnlyMessage = `Here is the one-time code to unlock your birthday card: ${state.otp}`;
+    const codeOnlyMessage = `Here is the one-time code to unlock your birthday card: ${activeState.otp}`;
 
     return (
       <motion.div
@@ -188,30 +235,30 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
         className="mx-auto max-w-xl rounded-sm border-2 border-ink bg-[#fbf4e4] p-8 shadow-[8px_8px_0_var(--ink)]"
       >
         <p className="hand text-3xl text-tomato">Sealed.</p>
-        <h2 className="display mt-1 text-4xl font-semibold">{state.recipient}'s card is ready.</h2>
+        <h2 className="display mt-1 text-4xl font-semibold">{activeState.recipient}'s card is ready.</h2>
 
         <div className="mt-8 space-y-6">
           <div>
             <span className="label">Private link</span>
-            <p className="mt-1 break-all font-bold">{state.link}</p>
+            <p className="mt-1 break-all font-bold">{activeState.link}</p>
             <div className="mt-2">
-              <CopyButton value={state.link} label="Copy link" />
+              <CopyButton value={activeState.link} label="Copy link" />
             </div>
           </div>
 
           <div className="border-y-2 border-dashed border-ink/20 py-5">
             <ShareButtons
-              recipient={state.recipient}
-              link={state.link}
+              recipient={activeState.recipient}
+              link={activeState.link}
               coverFile={firstUploadedPhoto}
             />
           </div>
 
           <div>
             <span className="label">One-time code</span>
-            <p className="display mt-1 text-6xl font-semibold tracking-[0.2em] text-tomato">{state.otp}</p>
+            <p className="display mt-1 text-6xl font-semibold tracking-[0.2em] text-tomato">{activeState.otp}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <CopyButton value={state.otp} label="Copy code" />
+              <CopyButton value={activeState.otp} label="Copy code" />
               <a
                 href={`https://wa.me/?text=${encodeURIComponent(codeOnlyMessage)}`}
                 target="_blank"
@@ -235,8 +282,6 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
       </motion.div>
     );
   }
-
-  const error = localError ?? state?.error;
 
   return (
     <form ref={formRef} onSubmit={onSubmit} className="mx-auto max-w-3xl space-y-12">
@@ -319,8 +364,8 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
 
       {error && <p role="alert" className="font-bold text-tomato">{error}</p>}
 
-      <button className="btn text-lg" disabled={pending || busy}>
-        {pending || busy ? "Sealing the card…" : "Seal the card"}
+      <button className="btn text-lg" disabled={busy}>
+        {busy ? "Sealing the card…" : "Seal the card"}
       </button>
     </form>
   );
