@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { logout } from "@/app/actions/auth";
+import { LoadingOverlay } from "./VelouraLoader";
 
 export default function LogoutButton() {
     const [showConfirm, setShowConfirm] = useState(false);
@@ -15,6 +16,7 @@ export default function LogoutButton() {
 
     return (
         <>
+            <LoadingOverlay show={isPending} label="Logging you out…" />
             <button
                 onClick={() => setShowConfirm(true)}
                 disabled={isPending}
