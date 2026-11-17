@@ -55,6 +55,13 @@ export default function MobileMenu({ user }: MobileMenuProps) {
                                 >
                                     My cards
                                 </Link>
+                                <Link
+                                    href="/dashboard/settings"
+                                    onClick={closeMenu}
+                                    className="w-full text-center py-2.5 px-5 rounded-full border-2 border-[#1C1917] bg-[#FAF6EF] shadow-[3px_3px_0px_#1C1917] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
+                                >
+                                    Settings
+                                </Link>
                                 <div className="flex justify-center pt-1">
                                     <LogoutButton />
                                 </div>

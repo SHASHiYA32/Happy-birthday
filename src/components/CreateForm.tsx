@@ -1,11 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { createCard, type CreateState } from "@/app/actions/cards";
 import { compressImage } from "@/lib/compress-image";
 import { sileo } from "sileo";
+import { OCCASIONS, OCCASION_LIST, nextOccurrence, type Occasion, type OccasionId } from "@/lib/occasions";
+import OccasionArt from "./OccasionArt";
+import { LoadingOverlay } from "./VelouraLoader";
 
 type Slide = { id: number; text: string; file: File | null; preview: string | null };
 
@@ -39,27 +42,29 @@ function ShareButtons({
   recipient,
   link,
   coverFile,
+  theme,
 }: {
   recipient: string;
   link: string;
   coverFile: File | null;
+  theme: Occasion;
 }) {
-  const [canNativeShare, setCanNativeShare] = useState(false);
-
-  useEffect(() => {
-    setCanNativeShare(typeof navigator !== "undefined" && typeof navigator.share === "function");
-  }, []);
+  const canNativeShare = useSyncExternalStore(
+    () => () => {},
+    () => typeof navigator.share === "function",
+    () => false,
+  );
 
   const beautifulMessage = [
     `Hi ${recipient},`,
     ``,
-    `I put together a special birthday card just for you, filled with memories and wishes waiting to be opened.`,
+    `I put together a special ${theme.noun} just for you, filled with wishes waiting to be opened.`,
     ``,
     `Open your card here:`,
     `${link}`,
   ].join("\n");
 
-  const shortTeaser = `Hi ${recipient}, I put together a special birthday card just for you, filled with memories and wishes waiting to be opened.`;
+  const shortTeaser = `Hi ${recipient}, I put together a special ${theme.noun} just for you, filled with wishes waiting to be opened.`;
 
   const encodedFullText = encodeURIComponent(beautifulMessage);
   const encodedTeaser = encodeURIComponent(shortTeaser);
@@ -69,7 +74,7 @@ function ShareButtons({
     if (!navigator.share) return;
     try {
       const shareData: ShareData = {
-        title: `A birthday card for ${recipient}`,
+        title: `A ${theme.noun} for ${recipient}`,
         text: beautifulMessage,
         url: link,
       };
@@ -105,7 +110,7 @@ function ShareButtons({
         </a>
 
         <a
-          href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}"e=${encodedTeaser}`}
+          href={`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedTeaser}`}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center rounded-full border-2 border-ink bg-[#1877F2] px-4 py-2 text-sm font-bold text-white shadow-[3px_3px_0_var(--ink)] transition-transform active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
@@ -114,11 +119,7 @@ function ShareButtons({
         </a>
 
         {canNativeShare && (
-          <button
-            type="button"
-            onClick={handleNativeShare}
-            className="btn btn-quiet !px-4 !py-2 text-sm"
-          >
+          <button type="button" onClick={handleNativeShare} className="btn btn-quiet !px-4 !py-2 text-sm">
             More apps
           </button>
         )}
@@ -127,9 +128,18 @@ function ShareButtons({
   );
 }
 
-export default function CreateForm({ defaultSender }: { defaultSender: string }) {
+export default function CreateForm({
+  defaultSender,
+  initialOccasion = "birthday",
+}: {
+  defaultSender: string;
+  initialOccasion?: OccasionId;
+}) {
+  const [occasion, setOccasion] = useState<OccasionId>(initialOccasion);
+  const theme = OCCASIONS[occasion];
+  const [date, setDate] = useState(() => nextOccurrence(OCCASIONS[initialOccasion].defaultMonthDay));
+  const [dateTouched, setDateTouched] = useState(false);
   const [resolvedState, setResolvedState] = useState<CreateState | null>(null);
-  const [state] = useActionState<CreateState, FormData>(createCard, {});
   const [, startTransition] = useTransition();
   const [slides, setSlides] = useState<Slide[]>(() => [blank()]);
   const [busy, setBusy] = useState(false);
@@ -138,20 +148,11 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
 
   useEffect(() => () => slides.forEach((s) => s.preview && URL.revokeObjectURL(s.preview)), []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const serverError = (state && typeof state === "object" && "error" in state)
-    ? (state as { error?: string }).error
-    : undefined;
-
-  const error = localError ?? serverError;
-
-  useEffect(() => {
-    if (error) {
-      sileo.error({
-        title: "Action Required",
-        description: error,
-      });
-    }
-  }, [error]);
+  function chooseOccasion(id: OccasionId) {
+    setOccasion(id);
+    // Fill in the usual date (Christmas Day, Valentine's Day) unless they already picked one themselves.
+    if (!dateTouched) setDate(nextOccurrence(OCCASIONS[id].defaultMonthDay));
+  }
 
   const update = (id: number, patch: Partial<Slide>) =>
     setSlides((all) => all.map((s) => (s.id === id ? { ...s, ...patch } : s)));
@@ -173,59 +174,64 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return;
     setBusy(true);
     setLocalError(null);
 
     const formElement = e.currentTarget;
 
-    const sealingPromise = async () => {
+    const seal = async (): Promise<CreateState> => {
       const base = new FormData(formElement);
       const fd = new FormData();
       for (const k of ["recipient", "sender", "birthday"]) fd.set(k, String(base.get(k) ?? ""));
+      fd.set("occasion", occasion);
       fd.set("count", String(slides.length));
       slides.forEach((s, i) => {
         fd.set(`text_${i}`, s.text);
         if (s.file) fd.set(`image_${i}`, s.file);
       });
 
-      // Execute server action ONCE and wait for the result
+      // Execute the server action once and wait for the result.
       const result = await createCard({}, fd);
-
-      if (result && typeof result === "object" && "error" in result && result.error) {
-        setLocalError(result.error);
-        throw new Error(result.error);
-      }
-
-      // Update state without triggering action() again (preventing duplicate insertion)
-      startTransition(() => {
-        setResolvedState(result);
-        setBusy(false);
-      });
-
+      if (!result.ok) throw new Error(result.error || "Couldn't seal the card. Please try again.");
       return result;
     };
 
-    sileo.promise(sealingPromise(), {
-      loading: { title: "Sealing card..." },
-      success: { title: "Card sealed!" },
-      error: { title: "Sealing failed" },
-    });
+    const promise = seal();
+    sileo
+      .promise(promise, {
+        loading: { title: "Sealing card..." },
+        success: { title: "Card sealed!" },
+        error: (err) => ({
+          title: "Sealing failed",
+          description: err instanceof Error ? err.message : "Please try again.",
+        }),
+      })
+      .catch(() => {});
+
+    try {
+      const result = await promise;
+      startTransition(() => setResolvedState(result));
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Couldn't seal the card. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const activeState = resolvedState ?? state;
-
-  if (activeState?.ok) {
+  if (resolvedState?.ok) {
+    const done = resolvedState;
     const firstUploadedPhoto = slides.find((s) => s.file !== null)?.file ?? null;
     const message = [
-      `Hi ${activeState.recipient},`,
+      `Hi ${done.recipient},`,
       ``,
-      `I put together a special birthday card just for you, filled with memories and wishes waiting to be opened.`,
+      `I put together a special ${theme.noun} just for you, filled with wishes waiting to be opened.`,
       ``,
-      `Open your card here: ${activeState.link}`,
-      `Use this one-time code to unlock it: ${activeState.otp}`,
+      `Open your card here: ${done.link}`,
+      `Use this one-time code to unlock it: ${done.otp}`,
     ].join("\n");
 
-    const codeOnlyMessage = `Here is the one-time code to unlock your birthday card: ${activeState.otp}`;
+    const codeOnlyMessage = `Here is the one-time code to unlock your ${theme.noun}: ${done.otp}`;
 
     return (
       <motion.div
@@ -234,31 +240,27 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
         transition={{ type: "spring", stiffness: 160, damping: 16 }}
         className="mx-auto max-w-xl rounded-sm border-2 border-ink bg-[#fbf4e4] p-8 shadow-[8px_8px_0_var(--ink)]"
       >
-        <p className="hand text-3xl text-tomato">Sealed.</p>
-        <h2 className="display mt-1 text-4xl font-semibold">{activeState.recipient}'s card is ready.</h2>
+        <p className="hand text-3xl" style={{ color: theme.accent }}>Sealed.</p>
+        <h2 className="display mt-1 text-4xl font-semibold">{done.recipient}&apos;s card is ready.</h2>
 
         <div className="mt-8 space-y-6">
           <div>
             <span className="label">Private link</span>
-            <p className="mt-1 break-all font-bold">{activeState.link}</p>
+            <p className="mt-1 break-all font-bold">{done.link}</p>
             <div className="mt-2">
-              <CopyButton value={activeState.link} label="Copy link" />
+              <CopyButton value={done.link} label="Copy link" />
             </div>
           </div>
 
           <div className="border-y-2 border-dashed border-ink/20 py-5">
-            <ShareButtons
-              recipient={activeState.recipient}
-              link={activeState.link}
-              coverFile={firstUploadedPhoto}
-            />
+            <ShareButtons recipient={done.recipient} link={done.link} coverFile={firstUploadedPhoto} theme={theme} />
           </div>
 
           <div>
             <span className="label">One-time code</span>
-            <p className="display mt-1 text-6xl font-semibold tracking-[0.2em] text-tomato">{activeState.otp}</p>
+            <p className="display mt-1 text-6xl font-semibold tracking-[0.2em] text-tomato">{done.otp}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <CopyButton value={activeState.otp} label="Copy code" />
+              <CopyButton value={done.otp} label="Copy code" />
               <a
                 href={`https://wa.me/?text=${encodeURIComponent(codeOnlyMessage)}`}
                 target="_blank"
@@ -285,6 +287,48 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
 
   return (
     <form ref={formRef} onSubmit={onSubmit} className="mx-auto max-w-3xl space-y-12">
+      <LoadingOverlay show={busy} label="Sealing your card…" />
+
+      <fieldset>
+        <legend className="label mb-3">What are you celebrating?</legend>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {OCCASION_LIST.map((o) => {
+            const on = o.id === occasion;
+            return (
+              <label
+                key={o.id}
+                className={`relative flex cursor-pointer flex-col items-center gap-2 border-2 border-ink p-3 text-center transition-all ${
+                  on ? "-translate-x-0.5 -translate-y-0.5 bg-[#fbf4e4] shadow-[5px_5px_0_var(--ink)]" : "bg-paper hover:bg-[#fbf4e4]"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="occasion-choice"
+                  value={o.id}
+                  checked={on}
+                  onChange={() => chooseOccasion(o.id)}
+                  className="sr-only"
+                />
+                <span className="grid h-16 w-16 place-items-center rounded-full border-2 border-ink" style={{ background: o.cover }}>
+                  <OccasionArt occasion={o.id} className="h-12 w-12" />
+                </span>
+                <span className="display text-lg font-semibold leading-none">{o.label}</span>
+                {on && (
+                  <span
+                    aria-hidden
+                    className="absolute right-2 top-2 grid h-5 w-5 place-items-center rounded-full border-2 border-ink text-[10px] font-extrabold text-[#fff8ec]"
+                    style={{ background: o.accent }}
+                  >
+                    ✓
+                  </span>
+                )}
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-sm text-ink-soft">{theme.blurb}</p>
+      </fieldset>
+
       <section className="grid gap-8 sm:grid-cols-2">
         <div>
           <label className="label" htmlFor="recipient">Who is it for?</label>
@@ -295,9 +339,21 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
           <input id="sender" name="sender" required maxLength={60} defaultValue={defaultSender} className="field" placeholder="Your name" />
         </div>
         <div className="sm:col-span-2">
-          <label className="label" htmlFor="birthday">Their birthday</label>
-          <input id="birthday" name="birthday" type="date" required className="field max-w-xs" />
-          <p className="mt-2 text-sm text-ink-soft">The card stays shut until this day, then opens with the code.</p>
+          <label className="label" htmlFor="birthday">{theme.dateLabel}</label>
+          <input
+            id="birthday"
+            name="birthday"
+            type="date"
+            required
+            value={date}
+            onChange={(e) => {
+              setDate(e.target.value);
+              setDateTouched(true);
+            }}
+            className="field max-w-xs"
+            suppressHydrationWarning
+          />
+          <p className="mt-2 text-sm text-ink-soft">{theme.dateHelp}</p>
         </div>
       </section>
 
@@ -326,7 +382,7 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
 
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="hand text-2xl text-tomato">Wish {i + 1}</span>
+                  <span className="hand text-2xl" style={{ color: theme.accent }}>Wish {i + 1}</span>
                   {slides.length > 1 && (
                     <button
                       type="button"
@@ -347,7 +403,7 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
                   value={s.text}
                   onChange={(e) => update(s.id, { text: e.target.value })}
                   className="hand mt-2 w-full resize-none border-0 border-b-2 border-ink bg-transparent text-2xl leading-snug outline-none focus:border-tomato"
-                  placeholder="Write it the way you'd say it…"
+                  placeholder={theme.wishPlaceholder}
                 />
                 <div className="text-right text-xs text-ink-soft">{s.text.length}/500</div>
               </div>
@@ -362,7 +418,7 @@ export default function CreateForm({ defaultSender }: { defaultSender: string })
         )}
       </section>
 
-      {error && <p role="alert" className="font-bold text-tomato">{error}</p>}
+      {localError && <p role="alert" className="font-bold text-tomato">{localError}</p>}
 
       <button className="btn text-lg" disabled={busy}>
         {busy ? "Sealing the card…" : "Seal the card"}

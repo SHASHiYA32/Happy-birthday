@@ -7,20 +7,14 @@ import { useGSAP } from "@gsap/react";
 import { AnimatePresence, motion } from "motion/react";
 import Confetti from "./ConfettiLazy";
 import ProtectedImage from "./ProtectedImage";
-import { createBirthdayPlayer, type BirthdayPlayer } from "@/lib/birthday-song";
+import OccasionArt from "./OccasionArt";
+import { createOccasionPlayer, type BirthdayPlayer } from "@/lib/birthday-song";
+import { OCCASIONS, type OccasionId } from "@/lib/occasions";
 
 gsap.registerPlugin(useGSAP);
 
 export type ViewerSlide = { text: string; image: string | null };
 type Phase = "cover" | "opening" | "show" | "end";
-
-const PALETTE = [
-  { bg: "#f3e9d6", fg: "#221b17" },
-  { bg: "#e2492f", fg: "#fff8ec" },
-  { bg: "#f3b232", fg: "#221b17" },
-  { bg: "#1d5a55", fg: "#fff8ec" },
-  { bg: "#f1b9ae", fg: "#221b17" },
-];
 
 const NARROW = "(max-width: 700px)";
 const TAP_MS = 250; // a press shorter than this is a tap, longer is a hold-to-pause
@@ -36,24 +30,6 @@ function useNarrow() {
     },
     () => window.matchMedia(NARROW).matches,
     () => false,
-  );
-}
-
-function Cake() {
-  return (
-    <svg viewBox="0 0 200 200" className="w-[58%] sm:w-[62%]" aria-hidden>
-      <ellipse cx="100" cy="176" rx="78" ry="9" fill="#221b17" opacity=".25" />
-      <rect x="38" y="112" width="124" height="58" rx="6" fill="#fff8ec" stroke="#221b17" strokeWidth="4" />
-      <path d="M38 126c12 14 22-6 34 8s22-8 34 6 22-8 34 6 14-4 22 2" fill="none" stroke="#f1b9ae" strokeWidth="9" strokeLinecap="round" />
-      <rect x="58" y="76" width="84" height="40" rx="6" fill="#f3b232" stroke="#221b17" strokeWidth="4" />
-      <path d="M58 90c10 12 18-5 28 6s18-8 28 4 18-6 28 2" fill="none" stroke="#fff8ec" strokeWidth="7" strokeLinecap="round" />
-      {[78, 100, 122].map((x) => (
-        <g key={x}>
-          <rect x={x - 3} y="52" width="6" height="26" fill="#1d5a55" stroke="#221b17" strokeWidth="3" />
-          <path d={`M${x} 28c9 9 8 18 0 21-8-3-9-12 0-21z`} fill="#fff8ec" stroke="#221b17" strokeWidth="3" />
-        </g>
-      ))}
-    </svg>
   );
 }
 
@@ -127,11 +103,14 @@ export default function CardExperience({
   recipient,
   sender,
   slides,
+  occasion = "birthday",
 }: {
   recipient: string;
   sender: string;
   slides: ViewerSlide[];
+  occasion?: OccasionId;
 }) {
+  const theme = OCCASIONS[occasion];
   const root = useRef<HTMLDivElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const card = useRef<HTMLDivElement>(null);
@@ -303,7 +282,7 @@ export default function CardExperience({
   function begin() {
     if (phase !== "cover") return;
     try {
-      player.current = createBirthdayPlayer();
+      player.current = createOccasionPlayer(occasion);
       player.current.start();
     } catch {
       /* no audio support: the card still plays */
@@ -317,7 +296,7 @@ export default function CardExperience({
     player.current?.setMuted(next);
   }
 
-  const colors = PALETTE[i % PALETTE.length];
+  const colors = theme.palette[i % theme.palette.length];
   const showing = phase === "show" || phase === "end";
   const ctl =
     "grid h-11 min-w-11 place-items-center rounded-full border-2 px-3 text-base leading-none transition-transform active:scale-95 disabled:opacity-30";
@@ -330,11 +309,12 @@ export default function CardExperience({
     >
       <motion.div
         className="absolute inset-0"
-        animate={{ backgroundColor: phase === "end" ? "#e2492f" : showing ? colors.bg : "#f3e9d6" }}
+        animate={{ backgroundColor: phase === "end" ? theme.endBg : showing ? colors.bg : "#f3e9d6" }}
         transition={{ duration: 0.8 }}
       />
       <Confetti
         className="pointer-events-none absolute inset-0"
+        variant={theme.confetti}
         count={showing ? (narrow ? 70 : 130) : narrow ? 30 : 45}
         burstKey={burst}
       />
@@ -349,7 +329,7 @@ export default function CardExperience({
           >
             {/* inside, right page */}
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 border-2 border-ink bg-[#fbf4e4] p-4 text-center shadow-[6px_6px_0_var(--ink)] sm:gap-3 sm:p-6 sm:shadow-[8px_8px_0_var(--ink)]">
-              <p data-inside className="display text-xl italic sm:text-2xl">Happy birthday,</p>
+              <p data-inside className="display text-xl italic sm:text-2xl">{theme.insideGreeting}</p>
               <p data-inside className="hand max-w-full break-words text-[clamp(2.5rem,13vw,3.75rem)] leading-none text-tomato">
                 {recipient}
               </p>
@@ -367,22 +347,29 @@ export default function CardExperience({
               <button
                 onClick={begin}
                 disabled={phase !== "cover"}
-                aria-label="Open your birthday card"
-                className="absolute inset-0 flex flex-col items-center justify-center gap-3 border-2 border-ink bg-tomato p-4 shadow-[6px_6px_0_var(--ink)] sm:gap-4 sm:p-6 sm:shadow-[8px_8px_0_var(--ink)]"
-                style={{ backfaceVisibility: "hidden", touchAction: "manipulation" }}
+                aria-label={`Open your ${theme.noun}`}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 border-2 border-ink p-4 shadow-[6px_6px_0_var(--ink)] sm:gap-4 sm:p-6 sm:shadow-[8px_8px_0_var(--ink)]"
+                style={{
+                  backfaceVisibility: "hidden",
+                  touchAction: "manipulation",
+                  background: theme.cover,
+                  color: theme.coverInk,
+                }}
               >
-                <p data-cover-in className="hand max-w-full break-words text-[clamp(1.75rem,8vw,2.25rem)] leading-none text-[#fff8ec]">
+                <p data-cover-in className="hand max-w-full break-words text-[clamp(1.75rem,8vw,2.25rem)] leading-none">
                   For {recipient}
                 </p>
-                <div data-cover-in className="flex w-full justify-center"><Cake /></div>
-                <p data-cover-in className="display text-2xl font-semibold italic text-[#fff8ec] sm:text-3xl">Happy Birthday</p>
+                <div data-cover-in className="flex w-full justify-center">
+                  <OccasionArt occasion={occasion} className="w-[58%] sm:w-[62%]" />
+                </div>
+                <p data-cover-in className="display text-2xl font-semibold italic sm:text-3xl">{theme.coverGreeting}</p>
               </button>
               {/* inside of the cover (left page) */}
               <div
                 className="absolute inset-0 flex items-center justify-center border-2 border-ink bg-[#f3e2bd] p-6"
                 style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
               >
-                <p className="hand text-4xl text-ink-soft sm:text-5xl">make a wish</p>
+                <p className="hand text-4xl text-ink-soft sm:text-5xl">{theme.coverInside}</p>
               </div>
             </div>
           </div>

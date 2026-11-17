@@ -22,6 +22,9 @@ export default async function SiteNav() {
             <Link href="/dashboard" className="hover:underline decoration-2 underline-offset-4">
               My cards
             </Link>
+            <Link href="/dashboard/settings" className="hover:underline decoration-2 underline-offset-4">
+              Settings
+            </Link>
             <LogoutButton />
           </>
         ) : (

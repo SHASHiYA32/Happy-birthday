@@ -3,8 +3,12 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { openCard, type OtpGateState } from "@/app/actions/viewer";
+import { OCCASIONS, type OccasionId } from "@/lib/occasions";
+import OccasionArt from "./OccasionArt";
+import { LoadingOverlay } from "./VelouraLoader";
 
-export default function OtpGate({ slug }: { slug: string }) {
+export default function OtpGate({ slug, occasion = "birthday" }: { slug: string; occasion?: OccasionId }) {
+  const theme = OCCASIONS[occasion];
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
   const form = useRef<HTMLFormElement>(null);
@@ -43,14 +47,21 @@ export default function OtpGate({ slug }: { slug: string }) {
 
   return (
     <main className="flex min-h-dvh items-center justify-center px-6 py-12">
+      <LoadingOverlay show={pending} label="Opening your card…" />
       <motion.div
         initial={{ opacity: 0, y: 30, rotate: -2 }}
         animate={{ opacity: 1, y: 0, rotate: 0 }}
         transition={{ type: "spring", stiffness: 130, damping: 16 }}
         className="w-full max-w-md border-2 border-ink bg-[#fbf4e4] p-8 text-center shadow-[8px_8px_0_var(--ink)]"
       >
-        <p className="hand text-3xl text-tomato">Psst.</p>
-        <h1 className="display mt-1 text-4xl font-semibold leading-tight">Someone made you a birthday card.</h1>
+        <div
+          className="mx-auto mb-4 grid h-20 w-20 place-items-center rounded-full border-2 border-ink"
+          style={{ background: theme.cover }}
+        >
+          <OccasionArt occasion={occasion} className="h-14 w-14" />
+        </div>
+        <p className="hand text-3xl" style={{ color: theme.accent }}>{theme.gateScript}</p>
+        <h1 className="display mt-1 text-4xl font-semibold leading-tight">Someone made you a {theme.noun}.</h1>
         <p className="mt-3 text-ink-soft">Type the six-digit code they sent you.</p>
 
         <form ref={form} action={action} className="mt-8">
