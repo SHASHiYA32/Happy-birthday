@@ -5,10 +5,11 @@
  * notification once, the next time they open the home page, and never again for that id.
  */
 export const LATEST_UPDATE = {
-  id: "2026-11-occasions",
-  title: "New: Christmas, Vesak & Valentine's cards",
-  description: "Not only birthdays any more. You can now make a sealed card for any of them.",
-  cta: "Make one",
+  id: "2026-11-fixes",
+  title: "Cards now match their theme",
+  description:
+    "Fixed a bug where Valentine, Vesak and Christmas cards opened as birthday cards. Each card now shows its own look, music and link preview.",
+  cta: "Make a card",
   href: "/create",
 };
 

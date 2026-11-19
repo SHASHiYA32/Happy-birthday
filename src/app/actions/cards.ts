@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateOtp, generateSlug, hashOtp } from "@/lib/security/otp";
 import { rateLimit } from "@/lib/security/rate-limit";
+import { isOccasion } from "@/lib/occasions";
 import {
   MAX_IMAGE_BYTES,
   MAX_SLIDES,
@@ -43,6 +44,10 @@ export async function createCard(_prev: CreateState, formData: FormData): Promis
   });
   if (!meta.success) return { error: "Please fill in their name, your name and the birthday." };
 
+  // No silent default: a form that forgets to send the type must fail loudly, not quietly make a birthday card.
+  const occasion = String(formData.get("occasion") ?? "");
+  if (!isOccasion(occasion)) return { error: "Choose what kind of card this is." };
+
   const count = Number(formData.get("count"));
   if (!Number.isInteger(count) || count < 1 || count > MAX_SLIDES) {
     return { error: `A card holds between 1 and ${MAX_SLIDES} wishes.` };
@@ -77,12 +82,20 @@ export async function createCard(_prev: CreateState, formData: FormData): Promis
       recipient_name: meta.data.recipient,
       sender_name: meta.data.sender,
       birthday_date: meta.data.birthday,
+      occasion,
       otp_hash: hash,
       otp_salt: salt,
     })
-    .select("id")
+    .select("id, occasion")
     .single();
   if (cardError || !card) return { error: "Couldn't save the card. Please try again." };
+
+  // Read-back check: the stored type must be the one chosen. If it isn't (an old database or old code),
+  // undo the card instead of quietly handing out a birthday card for a Valentine's one.
+  if (card.occasion !== occasion) {
+    await supabase.from("cards").delete().eq("id", card.id);
+    return { error: "This card's type wasn't saved correctly, so it was cancelled. Please contact support." };
+  }
 
   const uploaded: string[] = [];
   const rows: { card_id: string; position: number; wish_text: string; image_path: string | null }[] = [];

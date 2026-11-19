@@ -92,11 +92,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <script
           type="application/ld+json"
-          // "<" is escaped so the JSON can never close the script tag early.
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
         />
         {children}
-         <Toaster position="top-center"   options={{fill: "#f1b9ae"}}/>
+         <Toaster position="top-center" options={{fill: "#f1b9ae"}}/>
       </body>
     </html>
   );
